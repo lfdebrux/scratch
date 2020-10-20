@@ -8,15 +8,25 @@ peg::parser!{
 
         // TODO: replace String with string slices &str (need to think about lifetimes though)
 
-        // atoms
-        rule chr() = ![' ' | '\t' | '\n' | ';'] [_]
-        pub rule word() -> String = w:$(chr()+) { w.to_string() }
-        pub rule string() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
+        // ## Atoms
+
+        // The following characters have special meanings:
+        rule chr() = !['#' | '$' | '|' | '&' | ';' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n'] [_]
+
+        // Special characters terminate words
+        pub rule word_unquoted() -> String = w:$(chr()+) { w.to_string() }
+
+        // The single quote prevents special treatment of any character other than itself
+        pub rule word_quoted() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
+
+        pub rule word() -> String = word_quoted() / word_unquoted()
 
 
-        // lists
+        // ## Lists
+
+        // The primary data structure is the list, which is a sequence of words
         pub rule list() -> Vec<String>
-            = x:(string() / word()) ** _ { x }
+            = word() ** _
 
 
         // identifiers
@@ -80,7 +90,7 @@ mod tests {
 
     #[test]
     fn string() {
-        assert_eq!(rcsh_parser::string("'Hello world'"), Ok(String::from("Hello world")));
+        assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(String::from("Hello world")));
     }
 
     /*
