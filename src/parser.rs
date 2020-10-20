@@ -12,6 +12,7 @@ pub mod ast {
     #[derive(Debug, PartialEq, Eq)]
     pub enum Stmt {
         Assignment(String, List),
+        Command(String, List),
     }
 }
 
@@ -65,8 +66,8 @@ peg::parser!{
         pub rule assignment() -> ast::Stmt
             = n:name() _ "=" _ x:list() { ast::Stmt::Assignment(n, x) }
 
-        pub rule command() -> (String, ast::List)
-            = n:name() _ x:list() { (n, x) }
+        pub rule command() -> ast::Stmt
+            = n:name() _ x:list() { ast::Stmt::Command(n, x) }
 
     }
 }
@@ -142,6 +143,14 @@ mod tests {
         assert_eq!(
             rcsh_parser::assignment("this = $that"),
             Ok(ast::Stmt::Assignment("this".to_string(), vec![ast::Arg::Var("that".to_string())]))
+        );
+    }
+
+    #[test]
+    fn command() {
+        assert_eq!(
+            rcsh_parser::command("%echo Hello $name"),
+            Ok(ast::Stmt::Command("%echo".to_string(), vec![ast::Arg::Word("Hello".to_string()), ast::Arg::Var("name".to_string())]))
         );
     }
 
