@@ -40,6 +40,9 @@ peg::parser!{
         pub rule assignment() -> (String, Vec<String>)
             = n:name() _ "=" _ x:list() { (n, x) }
 
+        pub rule command() -> (String, Vec<String>)
+            = n:name() _ x:list() { (n, x) }
+
     }
 }
 
