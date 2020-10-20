@@ -1,5 +1,15 @@
 use peg;
 
+pub mod ast {
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Token {
+        Word(String),
+        Name(String),
+    }
+
+    pub type List = Vec<Token>;
+}
+
 peg::parser!{
     grammar rcsh_parser() for str {
 
@@ -14,12 +24,12 @@ peg::parser!{
         rule chr() = !['#' | '$' | '|' | '&' | ';' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n'] [_]
         //
         // Special characters terminate words.
-        pub rule word_unquoted() -> String = w:$(chr()+) { w.to_string() }
+        pub rule word_unquoted() -> ast::Token = w:$(chr()+) { ast::Token::Word(w.to_string()) }
         //
         // The single quote prevents special treatment of any character other than itself.
-        pub rule word_quoted() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
+        pub rule word_quoted() -> ast::Token = "'" s:$((!"'" [_])*) "'" { ast::Token::Word(s.to_string()) }
         //
-        pub rule word() -> String = word_quoted() / word_unquoted()
+        pub rule word() -> ast::Token = word_quoted() / word_unquoted()
 
 
         // ## Variables
@@ -27,11 +37,11 @@ peg::parser!{
         // For "free careting" to work correctly we must make certain assumptions about what
         // characters may appear in a variable name. We assume that a variable name consists only
         // of alphanumberic characters, percent (%), start (*), dash (-), and underscore (_).
-        pub rule name() -> String
-            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
+        pub rule name() -> ast::Token
+            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { ast::Token::Name(n.to_string()) }
         //
         // The value of a variable is referenced with the notation:
-        pub rule reference() -> String
+        pub rule reference() -> ast::Token
             = "$" v:name() { v }
 
 
@@ -39,16 +49,16 @@ peg::parser!{
         //
         // The primary data structure is the list, which is a sequence of words. Parentheses are
         // used to group lists. The empty list is represented by ().
-        pub rule list() -> Vec<String>
+        pub rule list() -> ast::List
             = "(" x:(word() ** _) ")" { x }
             / x:(word() ** _) { x }
 
 
         // statements
-        pub rule assignment() -> (String, Vec<String>)
+        pub rule assignment() -> (ast::Token, ast::List)
             = n:name() _ "=" _ x:list() { (n, x) }
 
-        pub rule command() -> (String, Vec<String>)
+        pub rule command() -> (ast::Token, ast::List)
             = n:name() _ x:list() { (n, x) }
 
     }
@@ -60,24 +70,24 @@ mod tests {
     use super::*;
 
     // from https://stackoverflow.com/questions/38183551
-    macro_rules! string_vec {
-        ($($x:expr),*) => (vec![$($x.to_string()),*]);
+    macro_rules! word_vec {
+        ($($x:expr),*) => (vec![$(ast::Token::Word($x.to_string())),*]);
     }
 
     #[test]
     fn list_unquoted() {
-        assert_eq!(rcsh_parser::list("2"), Ok(string_vec!["2"]));
-        assert_eq!(rcsh_parser::list("d e f"), Ok(string_vec!["d", "e", "f"]));
-        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(string_vec!["Hola todos"]));
+        assert_eq!(rcsh_parser::list("2"), Ok(word_vec!["2"]));
+        assert_eq!(rcsh_parser::list("d e f"), Ok(word_vec!["d", "e", "f"]));
+        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(word_vec!["Hola todos"]));
         assert_eq!(
             rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
-            Ok(string_vec!["Hola", "Lorenzo Anachury"])
+            Ok(word_vec!["Hola", "Lorenzo Anachury"])
         );
     }
 
     #[test]
     fn string() {
-        assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(String::from("Hello world")));
+        assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(ast::Token::Word(String::from("Hello world"))));
     }
 
     #[test]
@@ -95,23 +105,23 @@ mod tests {
     #[test]
     fn list() {
         assert_eq!(rcsh_parser::list("()"), Ok(vec![]));
-        assert_eq!(rcsh_parser::list("(1)"), Ok(string_vec!["1"]));
-        assert_eq!(rcsh_parser::list("(a b c)"), Ok(string_vec!["a", "b", "c"]));
-        assert_eq!(rcsh_parser::list("('Hello world')"), Ok(string_vec!["Hello world"]));
+        assert_eq!(rcsh_parser::list("(1)"), Ok(word_vec!["1"]));
+        assert_eq!(rcsh_parser::list("(a b c)"), Ok(word_vec!["a", "b", "c"]));
+        assert_eq!(rcsh_parser::list("('Hello world')"), Ok(word_vec!["Hello world"]));
         assert_eq!(
             rcsh_parser::list("(Hello 'Laurence de Bruxelles')"),
-            Ok(string_vec!["Hello", "Laurence de Bruxelles"])
+            Ok(word_vec!["Hello", "Laurence de Bruxelles"])
         );
     }
 
     #[test]
     fn assignment() {
-        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), string_vec!["1"])));
-        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
-        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((String::from("s"), string_vec!["Hello world"])));
+        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((ast::Token::Name(String::from("a")), word_vec!["1"])));
+        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((ast::Token::Name(String::from("list")), word_vec!["a", "b", "c"])));
+        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((ast::Token::Name(String::from("s")), word_vec!["Hello world"])));
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
-            Ok((String::from("hello"), string_vec!["Hello", "Laurence de Bruxelles"]))
+            Ok((ast::Token::Name(String::from("hello")), word_vec!["Hello", "Laurence de Bruxelles"]))
         );
     }
 
