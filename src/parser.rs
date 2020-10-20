@@ -25,8 +25,10 @@ peg::parser!{
 
         rule word() -> String = w:$(chr()+) { w.to_string() }
 
+        pub rule string() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
+
         rule list() -> Vec<String>
-            = word() ** _
+            = x:(string() / word()) ** _ { x }
 
         rule name() -> String
             = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
@@ -51,6 +53,16 @@ mod tests {
     fn assignment() {
         assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), string_vec!["1"])));
         assert_eq!(rcsh_parser::assignment("list = a b c"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
+        assert_eq!(rcsh_parser::assignment("s = 'Hello world'"), Ok((String::from("s"), string_vec!["Hello world"])));
+        assert_eq!(
+            rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
+            Ok((String::from("hello"), string_vec!["Hello", "Laurence de Bruxelles"]))
+        );
+    }
+
+    #[test]
+    fn string() {
+        assert_eq!(rcsh_parser::string("'Hello world'"), Ok(String::from("Hello world")));
     }
 
     /*
