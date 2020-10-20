@@ -3,22 +3,22 @@ use peg;
 peg::parser!{
     grammar rcsh_parser() for str {
 
-        // whitespace
+        // ## Whitespace
         rule _() = quiet!{ [' ' | '\t'] }
 
         // TODO: replace String with string slices &str (need to think about lifetimes though)
 
         // ## Atoms
-
+        //
         // The following characters have special meanings:
         rule chr() = !['#' | '$' | '|' | '&' | ';' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n'] [_]
-
-        // Special characters terminate words
+        //
+        // Special characters terminate words.
         pub rule word_unquoted() -> String = w:$(chr()+) { w.to_string() }
-
-        // The single quote prevents special treatment of any character other than itself
+        //
+        // The single quote prevents special treatment of any character other than itself.
         pub rule word_quoted() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
-
+        //
         pub rule word() -> String = word_quoted() / word_unquoted()
 
 
