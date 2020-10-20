@@ -16,7 +16,7 @@ pub mod ast {
     }
 }
 
-peg::parser!{
+peg::parser! {
     grammar rcsh_parser() for str {
 
         // ## Whitespace
@@ -84,8 +84,14 @@ mod tests {
 
     #[test]
     fn string() {
-        assert_eq!(rcsh_parser::word("''"), Ok(ast::Arg::Word(String::from(""))));
-        assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(ast::Arg::Word(String::from("Hello world"))));
+        assert_eq!(
+            rcsh_parser::word("''"),
+            Ok(ast::Arg::Word(String::from("")))
+        );
+        assert_eq!(
+            rcsh_parser::word_quoted("'Hello world'"),
+            Ok(ast::Arg::Word(String::from("Hello world")))
+        );
     }
 
     #[test]
@@ -105,7 +111,10 @@ mod tests {
         assert_eq!(rcsh_parser::list("()"), Ok(vec![]));
         assert_eq!(rcsh_parser::list("(1)"), Ok(word_vec!["1"]));
         assert_eq!(rcsh_parser::list("(a b c)"), Ok(word_vec!["a", "b", "c"]));
-        assert_eq!(rcsh_parser::list("('Hello world')"), Ok(word_vec!["Hello world"]));
+        assert_eq!(
+            rcsh_parser::list("('Hello world')"),
+            Ok(word_vec!["Hello world"])
+        );
         assert_eq!(
             rcsh_parser::list("(Hello 'Laurence de Bruxelles')"),
             Ok(word_vec!["Hello", "Laurence de Bruxelles"])
@@ -116,7 +125,10 @@ mod tests {
     fn list_unquoted() {
         assert_eq!(rcsh_parser::list("2"), Ok(word_vec!["2"]));
         assert_eq!(rcsh_parser::list("d e f"), Ok(word_vec!["d", "e", "f"]));
-        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(word_vec!["Hola todos"]));
+        assert_eq!(
+            rcsh_parser::list("'Hola todos'"),
+            Ok(word_vec!["Hola todos"])
+        );
         assert_eq!(
             rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
             Ok(word_vec!["Hola", "Lorenzo Anachury"])
@@ -127,22 +139,46 @@ mod tests {
     fn list_with_variable_references() {
         assert_eq!(
             rcsh_parser::list("Hello $name"),
-            Ok(vec![ast::Arg::Word("Hello".to_string()), ast::Arg::Var("name".to_string())])
+            Ok(vec![
+                ast::Arg::Word("Hello".to_string()),
+                ast::Arg::Var("name".to_string())
+            ])
         );
     }
 
     #[test]
     fn assignment() {
-        assert_eq!(rcsh_parser::assignment("a = 1"), Ok(ast::Stmt::Assignment(String::from("a"), word_vec!["1"])));
-        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok(ast::Stmt::Assignment(String::from("list"), word_vec!["a", "b", "c"])));
-        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok(ast::Stmt::Assignment(String::from("s"), word_vec!["Hello world"])));
+        assert_eq!(
+            rcsh_parser::assignment("a = 1"),
+            Ok(ast::Stmt::Assignment(String::from("a"), word_vec!["1"]))
+        );
+        assert_eq!(
+            rcsh_parser::assignment("list = (a b c)"),
+            Ok(ast::Stmt::Assignment(
+                String::from("list"),
+                word_vec!["a", "b", "c"]
+            ))
+        );
+        assert_eq!(
+            rcsh_parser::assignment("s = ('Hello world')"),
+            Ok(ast::Stmt::Assignment(
+                String::from("s"),
+                word_vec!["Hello world"]
+            ))
+        );
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
-            Ok(ast::Stmt::Assignment(String::from("hello"), word_vec!["Hello", "Laurence de Bruxelles"]))
+            Ok(ast::Stmt::Assignment(
+                String::from("hello"),
+                word_vec!["Hello", "Laurence de Bruxelles"]
+            ))
         );
         assert_eq!(
             rcsh_parser::assignment("this = $that"),
-            Ok(ast::Stmt::Assignment("this".to_string(), vec![ast::Arg::Var("that".to_string())]))
+            Ok(ast::Stmt::Assignment(
+                "this".to_string(),
+                vec![ast::Arg::Var("that".to_string())]
+            ))
         );
     }
 
@@ -150,7 +186,13 @@ mod tests {
     fn command() {
         assert_eq!(
             rcsh_parser::command("%echo Hello $name"),
-            Ok(ast::Stmt::Command("%echo".to_string(), vec![ast::Arg::Word("Hello".to_string()), ast::Arg::Var("name".to_string())]))
+            Ok(ast::Stmt::Command(
+                "%echo".to_string(),
+                vec![
+                    ast::Arg::Word("Hello".to_string()),
+                    ast::Arg::Var("name".to_string())
+                ]
+            ))
         );
     }
 
