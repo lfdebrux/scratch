@@ -31,11 +31,6 @@ peg::parser!{
             / x:(word() ** _) { x }
 
 
-        // identifiers
-        pub rule name() -> String
-            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
-
-
         // statements
         pub rule assignment() -> (String, Vec<String>)
             = n:name() _ "=" _ x:list() { (n, x) }
@@ -57,6 +52,22 @@ mod tests {
     }
 
     #[test]
+    fn list_unquoted() {
+        assert_eq!(rcsh_parser::list("2"), Ok(string_vec!["2"]));
+        assert_eq!(rcsh_parser::list("d e f"), Ok(string_vec!["d", "e", "f"]));
+        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(string_vec!["Hola todos"]));
+        assert_eq!(
+            rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
+            Ok(string_vec!["Hola", "Lorenzo Anachury"])
+        );
+    }
+
+    #[test]
+    fn string() {
+        assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(String::from("Hello world")));
+    }
+
+    #[test]
     fn name() {
         assert!(rcsh_parser::name("hello").is_ok());
         assert!(rcsh_parser::name("%read").is_ok());
@@ -66,17 +77,6 @@ mod tests {
 
         assert!(rcsh_parser::name("c$").is_err());
         assert!(rcsh_parser::name("path/name").is_err());
-    }
-
-    #[test]
-    fn assignment() {
-        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), string_vec!["1"])));
-        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
-        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((String::from("s"), string_vec!["Hello world"])));
-        assert_eq!(
-            rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
-            Ok((String::from("hello"), string_vec!["Hello", "Laurence de Bruxelles"]))
-        );
     }
 
     #[test]
@@ -92,19 +92,14 @@ mod tests {
     }
 
     #[test]
-    fn list_unquoted() {
-        assert_eq!(rcsh_parser::list("2"), Ok(string_vec!["2"]));
-        assert_eq!(rcsh_parser::list("d e f"), Ok(string_vec!["d", "e", "f"]));
-        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(string_vec!["Hola todos"]));
+    fn assignment() {
+        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), string_vec!["1"])));
+        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
+        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((String::from("s"), string_vec!["Hello world"])));
         assert_eq!(
-            rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
-            Ok(string_vec!["Hola", "Lorenzo Anachury"])
+            rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
+            Ok((String::from("hello"), string_vec!["Hello", "Laurence de Bruxelles"]))
         );
-    }
-
-    #[test]
-    fn string() {
-        assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(String::from("Hello world")));
     }
 
     /*
