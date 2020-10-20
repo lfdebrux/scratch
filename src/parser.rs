@@ -75,17 +75,6 @@ mod tests {
     }
 
     #[test]
-    fn list_unquoted() {
-        assert_eq!(rcsh_parser::list("2"), Ok(word_vec!["2"]));
-        assert_eq!(rcsh_parser::list("d e f"), Ok(word_vec!["d", "e", "f"]));
-        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(word_vec!["Hola todos"]));
-        assert_eq!(
-            rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
-            Ok(word_vec!["Hola", "Lorenzo Anachury"])
-        );
-    }
-
-    #[test]
     fn string() {
         assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(ast::Token::Word(String::from("Hello world"))));
     }
@@ -111,6 +100,17 @@ mod tests {
         assert_eq!(
             rcsh_parser::list("(Hello 'Laurence de Bruxelles')"),
             Ok(word_vec!["Hello", "Laurence de Bruxelles"])
+        );
+    }
+
+    #[test]
+    fn list_unquoted() {
+        assert_eq!(rcsh_parser::list("2"), Ok(word_vec!["2"]));
+        assert_eq!(rcsh_parser::list("d e f"), Ok(word_vec!["d", "e", "f"]));
+        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(word_vec!["Hola todos"]));
+        assert_eq!(
+            rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
+            Ok(word_vec!["Hola", "Lorenzo Anachury"])
         );
     }
 
