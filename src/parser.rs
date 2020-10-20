@@ -22,6 +22,19 @@ peg::parser!{
         pub rule word() -> String = word_quoted() / word_unquoted()
 
 
+        // ## Variables
+        //
+        // For "free careting" to work correctly we must make certain assumptions about what
+        // characters may appear in a variable name. We assume that a variable name consists only
+        // of alphanumberic characters, percent (%), start (*), dash (-), and underscore (_).
+        pub rule name() -> String
+            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
+        //
+        // The value of a variable is referenced with the notation:
+        pub rule reference() -> String
+            = "$" v:name() { v }
+
+
         // ## Lists
         //
         // The primary data structure is the list, which is a sequence of words. Parentheses are
@@ -68,15 +81,15 @@ mod tests {
     }
 
     #[test]
-    fn name() {
-        assert!(rcsh_parser::name("hello").is_ok());
-        assert!(rcsh_parser::name("%read").is_ok());
-        assert!(rcsh_parser::name("do_this").is_ok());
-        assert!(rcsh_parser::name("_private").is_ok());
-        assert!(rcsh_parser::name("a1").is_ok());
+    fn reference() {
+        assert!(rcsh_parser::reference("$hello").is_ok());
+        assert!(rcsh_parser::reference("$%read").is_ok());
+        assert!(rcsh_parser::reference("$do_this").is_ok());
+        assert!(rcsh_parser::reference("$_private").is_ok());
+        assert!(rcsh_parser::reference("$a1").is_ok());
 
-        assert!(rcsh_parser::name("c$").is_err());
-        assert!(rcsh_parser::name("path/name").is_err());
+        assert!(rcsh_parser::reference("$c$").is_err());
+        assert!(rcsh_parser::reference("$path/name").is_err());
     }
 
     #[test]
