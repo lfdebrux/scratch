@@ -8,6 +8,11 @@ pub mod ast {
     }
 
     pub type List = Vec<Arg>;
+
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum Stmt {
+        Assignment(String, List),
+    }
 }
 
 peg::parser!{
@@ -57,8 +62,8 @@ peg::parser!{
 
         // ## Statements
         //
-        pub rule assignment() -> (String, ast::List)
-            = n:name() _ "=" _ x:list() { (n, x) }
+        pub rule assignment() -> ast::Stmt
+            = n:name() _ "=" _ x:list() { ast::Stmt::Assignment(n, x) }
 
         pub rule command() -> (String, ast::List)
             = n:name() _ x:list() { (n, x) }
@@ -127,16 +132,16 @@ mod tests {
 
     #[test]
     fn assignment() {
-        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), word_vec!["1"])));
-        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((String::from("list"), word_vec!["a", "b", "c"])));
-        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((String::from("s"), word_vec!["Hello world"])));
+        assert_eq!(rcsh_parser::assignment("a = 1"), Ok(ast::Stmt::Assignment(String::from("a"), word_vec!["1"])));
+        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok(ast::Stmt::Assignment(String::from("list"), word_vec!["a", "b", "c"])));
+        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok(ast::Stmt::Assignment(String::from("s"), word_vec!["Hello world"])));
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
-            Ok((String::from("hello"), word_vec!["Hello", "Laurence de Bruxelles"]))
+            Ok(ast::Stmt::Assignment(String::from("hello"), word_vec!["Hello", "Laurence de Bruxelles"]))
         );
         assert_eq!(
             rcsh_parser::assignment("this = $that"),
-            Ok(("this".to_string(), vec![ast::Arg::Name("that".to_string())]))
+            Ok(ast::Stmt::Assignment("this".to_string(), vec![ast::Arg::Name("that".to_string())]))
         );
     }
 
