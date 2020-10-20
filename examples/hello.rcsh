@@ -1,0 +1,11 @@
+#!/usr/bin/rcsh
+
+echo -n 'What is your name? '
+
+NAME = $(%read)
+
+if [ ! -z "$NAME" ] {
+  echo Hello, "$NAME"!
+} else {
+  echo Hello, world!
+}

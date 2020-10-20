@@ -1,0 +1,11 @@
+# rcsh
+
+## Goals
+
+- Features of es
+- Simplicity and regularity of rc
+- Syntax more similar to POSIX sh than rc, but simpler
+
+## Licence
+
+Unless stated otherwise, the codebase is released under the [MIT Licence](LICENCE).
