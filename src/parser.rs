@@ -3,20 +3,28 @@ use peg;
 peg::parser!{
     grammar rcsh_parser() for str {
 
+        // whitespace
         rule _() = quiet!{ [' ' | '\t'] }
 
         // TODO: replace String with string slices &str (need to think about lifetimes though)
 
-        pub rule word() -> String = w:$((![' ' | '\t' | '\n' | ';'] [_])+) { w.to_string() }
-
+        // atoms
+        rule chr() = ![' ' | '\t' | '\n' | ';'] [_]
+        pub rule word() -> String = w:$(chr()+) { w.to_string() }
         pub rule string() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
 
+
+        // lists
         pub rule list() -> Vec<String>
             = x:(string() / word()) ** _ { x }
 
+
+        // identifiers
         pub rule name() -> String
             = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
 
+
+        // statements
         pub rule assignment() -> (String, Vec<String>)
             = n:name() _ "=" _ x:list() { (n, x) }
 
