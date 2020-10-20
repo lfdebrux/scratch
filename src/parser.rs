@@ -28,8 +28,6 @@ peg::parser!{
         //
         // The single quote prevents special treatment of any character other than itself.
         pub rule word_quoted() -> ast::Token = "'" s:$((!"'" [_])*) "'" { ast::Token::Word(s.to_string()) }
-        //
-        pub rule word() -> ast::Token = word_quoted() / word_unquoted()
 
 
         // ## Variables
@@ -43,6 +41,9 @@ peg::parser!{
         // The value of a variable is referenced with the notation:
         pub rule reference() -> ast::Token
             = "$" v:name() { v }
+
+
+        pub rule word() -> ast::Token = reference() / word_quoted() / word_unquoted()
 
 
         // ## Lists
@@ -115,6 +116,14 @@ mod tests {
     }
 
     #[test]
+    fn list_with_variable_references() {
+        assert_eq!(
+            rcsh_parser::list("Hello $name"),
+            Ok(vec![ast::Token::Word("Hello".to_string()), ast::Token::Name("name".to_string())])
+        );
+    }
+
+    #[test]
     fn assignment() {
         assert_eq!(rcsh_parser::assignment("a = 1"), Ok((ast::Token::Name(String::from("a")), word_vec!["1"])));
         assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((ast::Token::Name(String::from("list")), word_vec!["a", "b", "c"])));
@@ -122,6 +131,10 @@ mod tests {
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
             Ok((ast::Token::Name(String::from("hello")), word_vec!["Hello", "Laurence de Bruxelles"]))
+        );
+        assert_eq!(
+            rcsh_parser::assignment("this = $that"),
+            Ok((ast::Token::Name("this".to_string()), vec![ast::Token::Name("that".to_string())]))
         );
     }
 
