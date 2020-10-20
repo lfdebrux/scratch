@@ -3,8 +3,8 @@ use peg;
 pub mod ast {
     #[derive(Debug, PartialEq, Eq)]
     pub enum Arg {
+        Var(String),
         Word(String),
-        Name(String),
     }
 
     pub type List = Vec<Arg>;
@@ -47,7 +47,7 @@ peg::parser!{
         //
         // The value of a variable is referenced with the notation:
         pub rule reference() -> ast::Arg
-            = "$" v:name() { ast::Arg::Name(v) }
+            = "$" v:name() { ast::Arg::Var(v) }
 
 
         // ## Lists
@@ -126,7 +126,7 @@ mod tests {
     fn list_with_variable_references() {
         assert_eq!(
             rcsh_parser::list("Hello $name"),
-            Ok(vec![ast::Arg::Word("Hello".to_string()), ast::Arg::Name("name".to_string())])
+            Ok(vec![ast::Arg::Word("Hello".to_string()), ast::Arg::Var("name".to_string())])
         );
     }
 
@@ -141,7 +141,7 @@ mod tests {
         );
         assert_eq!(
             rcsh_parser::assignment("this = $that"),
-            Ok(ast::Stmt::Assignment("this".to_string(), vec![ast::Arg::Name("that".to_string())]))
+            Ok(ast::Stmt::Assignment("this".to_string(), vec![ast::Arg::Var("that".to_string())]))
         );
     }
 
