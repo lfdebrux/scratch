@@ -1,19 +1,5 @@
 use peg;
 
-        /*
-        rule comment() -> u32
-            = "#" [_]* "\n"? { 1 }
-
-        pub rule lines() -> Vec<u32>
-            = l:comment() * { l }
-
-        rule list() -> Vec<str>
-            = x:atom() ** " " { x }
-
-        rule atom() -> String
-            = x:$()
-        */
-
 peg::parser!{
     grammar rcsh_parser() for str {
 
