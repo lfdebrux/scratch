@@ -7,20 +7,21 @@ peg::parser!{
 
         // TODO: replace String with string slices &str (need to think about lifetimes though)
 
-        rule chr() = ![' ' | '\t' | '\n' | ';'] [_]
-
-        rule word() -> String = w:$(chr()+) { w.to_string() }
+        pub rule word() -> String = w:$((![' ' | '\t' | '\n' | ';'] [_])+) { w.to_string() }
 
         pub rule string() -> String = "'" s:$((!"'" [_])*) "'" { s.to_string() }
 
-        rule list() -> Vec<String>
+        pub rule list() -> Vec<String>
             = x:(string() / word()) ** _ { x }
 
-        rule name() -> String
+        pub rule name() -> String
             = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
 
         pub rule assignment() -> (String, Vec<String>)
             = n:name() _ "=" _ x:list() { (n, x) }
+
+        pub rule command() -> (String, Vec<String>)
+            = n:name() _ x:list() { (n, x) }
 
     }
 }
