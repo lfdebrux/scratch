@@ -37,6 +37,18 @@ mod tests {
     }
 
     #[test]
+    fn name() {
+        assert!(rcsh_parser::name("hello").is_ok());
+        assert!(rcsh_parser::name("%read").is_ok());
+        assert!(rcsh_parser::name("do_this").is_ok());
+        assert!(rcsh_parser::name("_private").is_ok());
+        assert!(rcsh_parser::name("a1").is_ok());
+
+        assert!(rcsh_parser::name("c$").is_err());
+        assert!(rcsh_parser::name("path/name").is_err());
+    }
+
+    #[test]
     fn assignment() {
         assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), string_vec!["1"])));
         assert_eq!(rcsh_parser::assignment("list = a b c"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
@@ -44,6 +56,17 @@ mod tests {
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
             Ok((String::from("hello"), string_vec!["Hello", "Laurence de Bruxelles"]))
+        );
+    }
+
+    #[test]
+    fn list() {
+        assert_eq!(rcsh_parser::list("1"), Ok(string_vec!["1"]));
+        assert_eq!(rcsh_parser::list("a b c"), Ok(string_vec!["a", "b", "c"]));
+        assert_eq!(rcsh_parser::list("'Hello world'"), Ok(string_vec!["Hello world"]));
+        assert_eq!(
+            rcsh_parser::list("Hello 'Laurence de Bruxelles'"),
+            Ok(string_vec!["Hello", "Laurence de Bruxelles"])
         );
     }
 
