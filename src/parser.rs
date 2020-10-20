@@ -23,10 +23,12 @@ peg::parser!{
 
 
         // ## Lists
-
-        // The primary data structure is the list, which is a sequence of words
+        //
+        // The primary data structure is the list, which is a sequence of words. Parentheses are
+        // used to group lists. The empty list is represented by ().
         pub rule list() -> Vec<String>
-            = word() ** _
+            = "(" x:(word() ** _) ")" { x }
+            / x:(word() ** _) { x }
 
 
         // identifiers
@@ -69,8 +71,8 @@ mod tests {
     #[test]
     fn assignment() {
         assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), string_vec!["1"])));
-        assert_eq!(rcsh_parser::assignment("list = a b c"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
-        assert_eq!(rcsh_parser::assignment("s = 'Hello world'"), Ok((String::from("s"), string_vec!["Hello world"])));
+        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((String::from("list"), string_vec!["a", "b", "c"])));
+        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((String::from("s"), string_vec!["Hello world"])));
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
             Ok((String::from("hello"), string_vec!["Hello", "Laurence de Bruxelles"]))
@@ -79,12 +81,24 @@ mod tests {
 
     #[test]
     fn list() {
-        assert_eq!(rcsh_parser::list("1"), Ok(string_vec!["1"]));
-        assert_eq!(rcsh_parser::list("a b c"), Ok(string_vec!["a", "b", "c"]));
-        assert_eq!(rcsh_parser::list("'Hello world'"), Ok(string_vec!["Hello world"]));
+        assert_eq!(rcsh_parser::list("()"), Ok(vec![]));
+        assert_eq!(rcsh_parser::list("(1)"), Ok(string_vec!["1"]));
+        assert_eq!(rcsh_parser::list("(a b c)"), Ok(string_vec!["a", "b", "c"]));
+        assert_eq!(rcsh_parser::list("('Hello world')"), Ok(string_vec!["Hello world"]));
         assert_eq!(
-            rcsh_parser::list("Hello 'Laurence de Bruxelles'"),
+            rcsh_parser::list("(Hello 'Laurence de Bruxelles')"),
             Ok(string_vec!["Hello", "Laurence de Bruxelles"])
+        );
+    }
+
+    #[test]
+    fn list_unquoted() {
+        assert_eq!(rcsh_parser::list("2"), Ok(string_vec!["2"]));
+        assert_eq!(rcsh_parser::list("d e f"), Ok(string_vec!["d", "e", "f"]));
+        assert_eq!(rcsh_parser::list("'Hola todos'"), Ok(string_vec!["Hola todos"]));
+        assert_eq!(
+            rcsh_parser::list("(Hola 'Lorenzo Anachury')"),
+            Ok(string_vec!["Hola", "Lorenzo Anachury"])
         );
     }
 
