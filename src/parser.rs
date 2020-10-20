@@ -18,7 +18,7 @@ peg::parser!{
 
         // TODO: replace String with string slices &str (need to think about lifetimes though)
 
-        // ## Atoms
+        // ## Words
         //
         // The following characters have special meanings:
         rule chr() = !['#' | '$' | '|' | '&' | ';' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n'] [_]
@@ -28,6 +28,8 @@ peg::parser!{
         //
         // The single quote prevents special treatment of any character other than itself.
         pub rule word_quoted() -> ast::Token = "'" s:$((!"'" [_])*) "'" { ast::Token::Word(s.to_string()) }
+        //
+        pub rule word() -> ast::Token = word_quoted() / word_unquoted()
 
 
         // ## Variables
@@ -43,16 +45,14 @@ peg::parser!{
             = "$" v:name() { v }
 
 
-        pub rule word() -> ast::Token = reference() / word_quoted() / word_unquoted()
-
-
         // ## Lists
         //
         // The primary data structure is the list, which is a sequence of words. Parentheses are
         // used to group lists. The empty list is represented by ().
+        pub rule token() -> ast::Token = reference() / word()
         pub rule list() -> ast::List
-            = "(" x:(word() ** _) ")" { x }
-            / x:(word() ** _) { x }
+            = "(" x:(token() ** _) ")" { x }
+            / x:(token() ** _) { x }
 
 
         // statements
