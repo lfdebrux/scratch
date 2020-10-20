@@ -146,6 +146,20 @@ mod tests {
     }
 
     #[test]
+    fn list_common_argument_styles() {
+        assert_eq!(
+            parser::list("-h --verbose --var=value --output file.ext"),
+            Ok(word_vec![
+               "-h",
+               "--verbose",
+               "--var=value",
+               "--output",
+               "file.ext"
+            ])
+        );
+    }
+
+    #[test]
     fn assignment() {
         assert_eq!(
             parser::assignment("a = 1"),
