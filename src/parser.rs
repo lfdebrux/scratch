@@ -77,6 +77,7 @@ mod tests {
 
     #[test]
     fn string() {
+        assert_eq!(rcsh_parser::word("''"), Ok(ast::Token::Word(String::from(""))));
         assert_eq!(rcsh_parser::word_quoted("'Hello world'"), Ok(ast::Token::Word(String::from("Hello world"))));
     }
 
