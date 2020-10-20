@@ -37,12 +37,12 @@ peg::parser!{
         // For "free careting" to work correctly we must make certain assumptions about what
         // characters may appear in a variable name. We assume that a variable name consists only
         // of alphanumberic characters, percent (%), start (*), dash (-), and underscore (_).
-        pub rule name() -> ast::Arg
-            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { ast::Arg::Name(n.to_string()) }
+        pub rule name() -> String
+            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
         //
         // The value of a variable is referenced with the notation:
         pub rule reference() -> ast::Arg
-            = "$" v:name() { v }
+            = "$" v:name() { ast::Arg::Name(v) }
 
 
         // ## Lists
@@ -57,10 +57,10 @@ peg::parser!{
 
         // ## Statements
         //
-        pub rule assignment() -> (ast::Arg, ast::List)
+        pub rule assignment() -> (String, ast::List)
             = n:name() _ "=" _ x:list() { (n, x) }
 
-        pub rule command() -> (ast::Arg, ast::List)
+        pub rule command() -> (String, ast::List)
             = n:name() _ x:list() { (n, x) }
 
     }
@@ -127,16 +127,16 @@ mod tests {
 
     #[test]
     fn assignment() {
-        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((ast::Arg::Name(String::from("a")), word_vec!["1"])));
-        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((ast::Arg::Name(String::from("list")), word_vec!["a", "b", "c"])));
-        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((ast::Arg::Name(String::from("s")), word_vec!["Hello world"])));
+        assert_eq!(rcsh_parser::assignment("a = 1"), Ok((String::from("a"), word_vec!["1"])));
+        assert_eq!(rcsh_parser::assignment("list = (a b c)"), Ok((String::from("list"), word_vec!["a", "b", "c"])));
+        assert_eq!(rcsh_parser::assignment("s = ('Hello world')"), Ok((String::from("s"), word_vec!["Hello world"])));
         assert_eq!(
             rcsh_parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
-            Ok((ast::Arg::Name(String::from("hello")), word_vec!["Hello", "Laurence de Bruxelles"]))
+            Ok((String::from("hello"), word_vec!["Hello", "Laurence de Bruxelles"]))
         );
         assert_eq!(
             rcsh_parser::assignment("this = $that"),
-            Ok((ast::Arg::Name("this".to_string()), vec![ast::Arg::Name("that".to_string())]))
+            Ok(("this".to_string(), vec![ast::Arg::Name("that".to_string())]))
         );
     }
 
