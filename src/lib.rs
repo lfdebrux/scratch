@@ -2,27 +2,26 @@ use peg;
 
 pub mod ast {
     #[derive(Debug, PartialEq, Eq)]
-    pub enum Arg {
-        Var(String),
-        Word(String),
+    pub enum Arg<'a> {
+        Var(&'a str),
+        Word(&'a str),
     }
 
-    pub type List = Vec<Arg>;
+    pub type List<'a> = Vec<Arg<'a>>;
 
     #[derive(Debug, PartialEq, Eq)]
-    pub enum Stmt {
-        Assignment(Arg, List),
-        Command(Arg, List),
+    pub enum Stmt<'a> {
+        Assignment(Arg<'a>, List<'a>),
+        Command(Arg<'a>, List<'a>),
     }
 }
 
+// mod parser
 peg::parser! {
     grammar parser() for str {
 
         // ## Whitespace
         rule _() = quiet!{ [' ' | '\t'] }
-
-        // TODO: replace String with string slices &str (need to think about lifetimes though)
 
         // ## Words
         //
@@ -30,12 +29,12 @@ peg::parser! {
         rule chr() = !['#' | '$' | '|' | '&' | ';' | '(' | ')' | '<' | '>' | ' ' | '\t' | '\n'] [_]
         //
         // Special characters terminate words.
-        pub rule word_unquoted() -> ast::Arg = w:$(chr()+) { ast::Arg::Word(w.to_string()) }
+        pub rule word_unquoted() -> ast::Arg<'input> = w:$(chr()+) { ast::Arg::Word(w) }
         //
         // The single quote prevents special treatment of any character other than itself.
-        pub rule word_quoted() -> ast::Arg = "'" s:$((!"'" [_])*) "'" { ast::Arg::Word(s.to_string()) }
+        pub rule word_quoted() -> ast::Arg<'input> = "'" s:$((!"'" [_])*) "'" { ast::Arg::Word(s) }
         //
-        pub rule word() -> ast::Arg = word_quoted() / word_unquoted()
+        pub rule word() -> ast::Arg<'input> = word_quoted() / word_unquoted()
 
 
         // ## Variables
@@ -43,11 +42,11 @@ peg::parser! {
         // For "free careting" to work correctly we must make certain assumptions about what
         // characters may appear in a variable name. We assume that a variable name consists only
         // of alphanumberic characters, percent (%), start (*), dash (-), and underscore (_).
-        pub rule name() -> String
-            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n.to_string() }
+        pub rule name() -> &'input str
+            = n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '%' | '*' | '_' | '-']+) { n }
         //
         // The value of a variable is referenced with the notation:
-        pub rule reference() -> ast::Arg
+        pub rule reference() -> ast::Arg<'input>
             = "$" v:name() { ast::Arg::Var(v) }
 
 
@@ -55,18 +54,18 @@ peg::parser! {
         //
         // The primary data structure is the list, which is a sequence of words. Parentheses are
         // used to group lists. The empty list is represented by ().
-        pub rule arg() -> ast::Arg = reference() / word()
-        pub rule list() -> ast::List
+        pub rule arg() -> ast::Arg<'input> = reference() / word()
+        pub rule list() -> ast::List<'input>
             = "(" x:(arg() ** _) ")" { x }
             / x:(arg() ** _) { x }
 
 
         // ## Statements
         //
-        pub rule assignment() -> ast::Stmt
+        pub rule assignment() -> ast::Stmt<'input>
             = n:arg() _ "=" _ x:list() { ast::Stmt::Assignment(n, x) }
 
-        pub rule command() -> ast::Stmt
+        pub rule command() -> ast::Stmt<'input>
             = n:arg() _ x:list() { ast::Stmt::Command(n, x) }
 
     }
@@ -79,18 +78,18 @@ mod tests {
 
     // from https://stackoverflow.com/questions/38183551
     macro_rules! word_vec {
-        ($($x:expr),*) => (vec![$(ast::Arg::Word($x.to_string())),*]);
+        ($($x:expr),*) => (vec![$(ast::Arg::Word($x)),*]);
     }
 
     #[test]
     fn string() {
         assert_eq!(
             parser::word("''"),
-            Ok(ast::Arg::Word(String::from("")))
+            Ok(ast::Arg::Word(""))
         );
         assert_eq!(
             parser::word_quoted("'Hello world'"),
-            Ok(ast::Arg::Word(String::from("Hello world")))
+            Ok(ast::Arg::Word("Hello world"))
         );
     }
 
@@ -140,8 +139,8 @@ mod tests {
         assert_eq!(
             parser::list("Hello $name"),
             Ok(vec![
-                ast::Arg::Word("Hello".to_string()),
-                ast::Arg::Var("name".to_string())
+                ast::Arg::Word("Hello"),
+                ast::Arg::Var("name")
             ])
         );
     }
@@ -150,34 +149,34 @@ mod tests {
     fn assignment() {
         assert_eq!(
             parser::assignment("a = 1"),
-            Ok(ast::Stmt::Assignment(ast::Arg::Word(String::from("a")), word_vec!["1"]))
+            Ok(ast::Stmt::Assignment(ast::Arg::Word("a"), word_vec!["1"]))
         );
         assert_eq!(
             parser::assignment("list = (a b c)"),
             Ok(ast::Stmt::Assignment(
-                ast::Arg::Word(String::from("list")),
+                ast::Arg::Word("list"),
                 word_vec!["a", "b", "c"]
             ))
         );
         assert_eq!(
             parser::assignment("s = ('Hello world')"),
             Ok(ast::Stmt::Assignment(
-                ast::Arg::Word(String::from("s")),
+                ast::Arg::Word("s"),
                 word_vec!["Hello world"]
             ))
         );
         assert_eq!(
             parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
             Ok(ast::Stmt::Assignment(
-                ast::Arg::Word(String::from("hello")),
+                ast::Arg::Word("hello"),
                 word_vec!["Hello", "Laurence de Bruxelles"]
             ))
         );
         assert_eq!(
             parser::assignment("this = $that"),
             Ok(ast::Stmt::Assignment(
-                ast::Arg::Word("this".to_string()),
-                vec![ast::Arg::Var("that".to_string())]
+                ast::Arg::Word("this"),
+                vec![ast::Arg::Var("that")]
             ))
         );
     }
@@ -187,7 +186,7 @@ mod tests {
         assert_eq!(
             parser::assignment("$pointer = value"),
             Ok(ast::Stmt::Assignment(
-                    ast::Arg::Var("pointer".to_string()),
+                    ast::Arg::Var("pointer"),
                     word_vec!["value"]
             ))
         );
@@ -198,10 +197,10 @@ mod tests {
         assert_eq!(
             parser::command("%echo Hello $name"),
             Ok(ast::Stmt::Command(
-                ast::Arg::Word("%echo".to_string()),
+                ast::Arg::Word("%echo"),
                 vec![
-                    ast::Arg::Word("Hello".to_string()),
-                    ast::Arg::Var("name".to_string())
+                    ast::Arg::Word("Hello"),
+                    ast::Arg::Var("name")
                 ]
             ))
         );
@@ -212,7 +211,7 @@ mod tests {
         assert_eq!(
             parser::command("$command 1 2"),
             Ok(ast::Stmt::Command(
-                    ast::Arg::Var("command".to_string()),
+                    ast::Arg::Var("command"),
                     word_vec!["1", "2"]
             ))
         );
