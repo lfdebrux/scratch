@@ -11,8 +11,8 @@ pub mod ast {
 
     #[derive(Debug, PartialEq, Eq)]
     pub enum Stmt {
-        Assignment(String, List),
-        Command(String, List),
+        Assignment(Arg, List),
+        Command(Arg, List),
     }
 }
 
@@ -64,10 +64,10 @@ peg::parser! {
         // ## Statements
         //
         pub rule assignment() -> ast::Stmt
-            = n:name() _ "=" _ x:list() { ast::Stmt::Assignment(n, x) }
+            = n:arg() _ "=" _ x:list() { ast::Stmt::Assignment(n, x) }
 
         pub rule command() -> ast::Stmt
-            = n:name() _ x:list() { ast::Stmt::Command(n, x) }
+            = n:arg() _ x:list() { ast::Stmt::Command(n, x) }
 
     }
 }
@@ -150,34 +150,45 @@ mod tests {
     fn assignment() {
         assert_eq!(
             parser::assignment("a = 1"),
-            Ok(ast::Stmt::Assignment(String::from("a"), word_vec!["1"]))
+            Ok(ast::Stmt::Assignment(ast::Arg::Word(String::from("a")), word_vec!["1"]))
         );
         assert_eq!(
             parser::assignment("list = (a b c)"),
             Ok(ast::Stmt::Assignment(
-                String::from("list"),
+                ast::Arg::Word(String::from("list")),
                 word_vec!["a", "b", "c"]
             ))
         );
         assert_eq!(
             parser::assignment("s = ('Hello world')"),
             Ok(ast::Stmt::Assignment(
-                String::from("s"),
+                ast::Arg::Word(String::from("s")),
                 word_vec!["Hello world"]
             ))
         );
         assert_eq!(
             parser::assignment("hello = Hello 'Laurence de Bruxelles'"),
             Ok(ast::Stmt::Assignment(
-                String::from("hello"),
+                ast::Arg::Word(String::from("hello")),
                 word_vec!["Hello", "Laurence de Bruxelles"]
             ))
         );
         assert_eq!(
             parser::assignment("this = $that"),
             Ok(ast::Stmt::Assignment(
-                "this".to_string(),
+                ast::Arg::Word("this".to_string()),
                 vec![ast::Arg::Var("that".to_string())]
+            ))
+        );
+    }
+
+    #[test]
+    fn assignment_to_name_in_var() {
+        assert_eq!(
+            parser::assignment("$pointer = value"),
+            Ok(ast::Stmt::Assignment(
+                    ast::Arg::Var("pointer".to_string()),
+                    word_vec!["value"]
             ))
         );
     }
@@ -187,11 +198,22 @@ mod tests {
         assert_eq!(
             parser::command("%echo Hello $name"),
             Ok(ast::Stmt::Command(
-                "%echo".to_string(),
+                ast::Arg::Word("%echo".to_string()),
                 vec![
                     ast::Arg::Word("Hello".to_string()),
                     ast::Arg::Var("name".to_string())
                 ]
+            ))
+        );
+    }
+
+    #[test]
+    fn command_in_var() {
+        assert_eq!(
+            parser::command("$command 1 2"),
+            Ok(ast::Stmt::Command(
+                    ast::Arg::Var("command".to_string()),
+                    word_vec!["1", "2"]
             ))
         );
     }
