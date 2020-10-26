@@ -5,6 +5,16 @@ Find and classify code
 
 This package lets you find bits of code in a large codebase using a Python DSL.
 
+Requirements
+============
+
+This tool relies on ripgrep (https://github.com/BurntSushi/ripgrep) to do file
+searching, make sure it is installed somewhere in your PATH.
+
+You'll also need to install the following Python packages to use this tool:
+
+    pip install sh
+
 Bugs
 ====
 
