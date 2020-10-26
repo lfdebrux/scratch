@@ -542,16 +542,20 @@ if __name__ == "__main__":
         sep = "------------------"
         err = lambda *args: print(*args, file=sys.stderr)  # noqa: E731
 
+        ret = 0
+
         try:
             err("running unit tests")
             python("-m", "doctest", __file__, _fg=True)
         except sh.ErrorReturnCode:
+            ret = 1
             err(sep)
 
         try:
             err("running integration test")
             test_code_search()
         except AssertionError as e:
+            ret = 1
             err(f"integration test test_code_search() failed with error: {e}")
             err(sep)
 
@@ -559,13 +563,14 @@ if __name__ == "__main__":
             err(f"flake8 {sys.argv[0]}")
             flake8(__file__, ignore="E501", _fg=True)
         except sh.ErrorReturnCode:
+            ret = 1
             err(sep)
 
         try:
             err(f"mypy {sys.argv[0]}")
             mypy(__file__, _fg=True)
         except sh.ErrorReturnCode:
-            pass
+            ret = 1
         finally:
             err(sep)
 
@@ -573,9 +578,9 @@ if __name__ == "__main__":
             err(f"black {sys.argv[0]}")
             black(__file__, check=True, _fg=True)
         except sh.ErrorReturnCode:
-            pass
-        finally:
-            err(sep)
+            ret = 1
+
+        sys.exit(ret)
 
     else:
         Search.main()
