@@ -454,6 +454,19 @@ class AppStyles(Styles):
     prune = True
 
 
+class BuyerFrontendOverrides(Styles):
+    epic = "App overrides (old)"
+
+    classname = r"""(?x:
+        save-search-page |
+        marketplace-homepage-heading |
+        which-service-won-contract-page |
+        tell-us-about-contract-page |
+        did-you-award-contract-page |
+        sidebar-heading
+    )"""
+
+
 class CheckboxesWTForms(DMWTForms):
     epic = "Checkboxes"
 
@@ -516,6 +529,18 @@ class InsetText(Styles):
     classname = r"(panel.*|notice.*)"
 
 
+class NotificationBannerTemplate(TemplateInclude):
+    epic = "Banner"
+
+    template = "notification-banner.html"
+
+
+class NotificationBannerStyles(Styles):
+    epic = "Banner"
+
+    classname = r"banner.*"
+
+
 class RadiosTemplate(TemplateInclude):
     epic = "Radios"
 
@@ -538,6 +563,12 @@ class SearchSummaryTemplate(TemplateInclude):
     epic = "Search summary"
 
     template = "search-summary.html"
+
+
+class TemporaryMessageTemplate(TemplateInclude):
+    epic = "Banner"
+
+    template = "temporary-message.html"
 
 
 class TextInputWTForms(DMWTForms):
