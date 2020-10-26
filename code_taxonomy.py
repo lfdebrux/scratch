@@ -96,11 +96,11 @@ class Search:
         >>> class A(TestSearch):
         ...     pattern = ...
         >>> list(TestSearch.all_searches())
-        [<class 'code_search.A'>, <class 'code_search.TestSearch'>]
+        [<class 'code_taxonomy.A'>, <class 'code_taxonomy.TestSearch'>]
         >>> class B(A):
         ...     pattern = ...
         >>> list(TestSearch.all_searches())
-        [<class 'code_search.B'>, <class 'code_search.A'>, <class 'code_search.TestSearch'>]
+        [<class 'code_taxonomy.B'>, <class 'code_taxonomy.A'>, <class 'code_taxonomy.TestSearch'>]
         """
         for subclass in cls.__subclasses__():
             if subclass.__subclasses__():
