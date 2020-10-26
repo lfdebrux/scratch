@@ -89,7 +89,7 @@ class Search:
 
     @classmethod
     def all_searches(cls, include_self=True) -> Iterable:
-        """Walk through the class hierarchy depth first
+        """Walk through the class hierarchy leaves first (post-order)
 
         >>> class TestSearch(Search):
         ...     pattern = ...
@@ -105,7 +105,7 @@ class Search:
         for subclass in cls.__subclasses__():
             if subclass.__subclasses__():
                 yield from subclass.all_searches(include_self=False)
-            yield subclass  # depth first, THIS IS IMPORTANT
+            yield subclass  # post-order, THIS IS IMPORTANT
         if include_self:
             yield cls
 
@@ -191,7 +191,7 @@ class Search:
         paths: Optional[Iterable[Path]] = None,
     ) -> Iterator[dict]:
         logging.debug(f"searching for {searches}")
-        # We are going to construct a list of searches, depth first.
+        # We are going to construct a list of searches, tree leaves first.
         # This assumes your class hierarchy has more specific searches the
         # deeper it goes. You may get odd results otherwise.
         search_args = itertools.groupby(
