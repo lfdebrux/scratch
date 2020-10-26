@@ -41,6 +41,7 @@ from typing import (
 
 import sh  # type: ignore
 from sh import git, rg  # type: ignore
+from typing_extensions import TypedDict
 
 FRONTEND_REPOS = {
     Path("digitalmarketplace-admin-frontend"),
@@ -71,6 +72,10 @@ def github_url(match) -> Optional[str]:
     return (
         f"https://github.com/{org}/{repo}/blob/{revision}/{Path(*path)}#{line_number}"
     )
+
+
+class MatchedLines:
+    pass
 
 
 class Search:
@@ -257,7 +262,9 @@ class Search:
             epic_key: list(epic_searches)
             for epic_key, epic_searches in itertools.groupby(
                 searches,
-                key=lambda c: c.epic.lower().replace(" ", "-").replace(".", ""),
+                key=lambda c: c.epic.lower().translate(
+                    str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
+                ),
             )
         }
         epics.setdefault("all", [cls])
