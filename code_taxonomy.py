@@ -228,11 +228,22 @@ class Search:
             matches = map(
                 lambda m: {
                     **m,
-                    "epics": [sub.epic for sub in _classify(m, subsearches)],
+                    "epics": {sub.epic for sub in _classify(m, subsearches)},
                     "github_url": github_url(m),
                 },
                 matches,
             )
+
+            prune: Set[str] = {
+                sub.epic
+                for s in searches
+                for sub in s.all_searches()
+                if sub not in searches and getattr(sub, "prune", False)
+            }
+            if prune:
+                logging.debug(f"pruning epics {prune}")
+                matches = map(lambda m: {**m, "epics": m["epics"] - prune}, matches)
+                matches = filter(lambda m: bool(m["epics"]), matches)
 
             yield from matches
 
@@ -338,10 +349,10 @@ def test_code_search():
         for match in matches:
             assert str(match["path"]).startswith(str(testdir))
             if match["path"].name == "test1.txt":
-                assert match["epics"] == ["Hello foo"]
+                assert match["epics"] == {"Hello foo"}
                 assert match["lines"] == "Hello foo"
             elif match["path"].name == "test2.txt":
-                assert match["epics"] == ["Hello"]
+                assert match["epics"] == {"Hello"}
                 assert match["lines"] == "Hello bar"
             else:
                 assert match["path"].name != "test3.txt"
@@ -399,6 +410,8 @@ class GOVUKStyles(Styles):
 
     classname = r"""govuk-[\w_-]+"""
 
+    prune = True
+
 
 class JinjaCode(FrontendCode):
     epic = "All Jinja code"
@@ -438,6 +451,8 @@ class AppStyles(Styles):
 
     classname = r"app-*"
 
+    prune = True
+
 
 class CheckboxesWTForms(DMWTForms):
     epic = "Checkboxes"
@@ -467,6 +482,8 @@ class DMFrontendStyles(Styles):
     epic = "Digital Marketplace GOV.UK Frontend styles"
 
     classname = r"dm-.*"
+
+    prune = True
 
 
 class JavaScript(Styles):
