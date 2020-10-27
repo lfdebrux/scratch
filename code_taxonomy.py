@@ -39,6 +39,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
 from typing import (
     ClassVar,
+    Counter,
     Dict,
     Iterable,
     Iterator,
@@ -264,13 +265,12 @@ class Search:
         epics: Dict[str, List[Type[Search]]]
 
         searches = set(s for s in cls.all_searches() if hasattr(s, "epic"))
+        to_key = str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
         epics = {
             epic_key: list(epic_searches)
             for epic_key, epic_searches in itertools.groupby(
                 searches,
-                key=lambda c: c.epic.lower().translate(
-                    str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
-                ),
+                key=lambda c: c.epic.lower().translate(to_key),
             )
         }
         epics.setdefault("all", [cls])
@@ -308,12 +308,12 @@ class Search:
         matches = Search.search_for(searches, paths=args.path)
 
         if args.summary:
-            count = collections.Counter()
+            counter: Counter[str] = collections.Counter()
             for m in matches:
                 for epic in m["epics"]:
-                    count[epic] += 1
+                    counter[epic] += 1
             print("epic", "count", sep=",")
-            for epic, count in count.items():
+            for epic, count in counter.items():
                 print(epic, count, sep=",")
         elif args.format == "json":
 
