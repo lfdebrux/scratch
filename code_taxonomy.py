@@ -88,20 +88,19 @@ def github_url(match) -> Optional[str]:
 
 
 class Match(TypedDict):
-    path: Path
     lines: str
     line_number: int
-    submatches: List[Submatch]
-
-
-class Submatch(TypedDict, total=False):
     match: str
-    groups: Dict[str, Any]
+    path: Path
 
 
 class ClassifiedMatch(Match):
     epics: Set[str]
     github_url: Optional[str]
+
+    # By default this is the output of re.Match.groupdict() but if you override
+    # Search._match() you can put whatever you find useful here
+    groups: Dict[str, Any]
 
 
 class Search:
@@ -202,18 +201,21 @@ class Search:
         results = (
             json.loads(line, object_hook=cls.rg_json_object_hook) for line in out
         )
-        matches = (result["data"] for result in results if result["type"] == "match")
-        return matches
+        rg_matches = (result["data"] for result in results if result["type"] == "match")
+        for m in rg_matches:
+            for sub in m["submatches"]:
+                match: Match = m.copy()
+                del match["submatches"]
+                match.update(sub)
+                yield match
 
     @classmethod
-    def _match(
-        cls, matched: Set[Type["Search"]], match: Match, submatch: Submatch
-    ) -> bool:
+    def _match(cls, matched: Set[Type["Search"]], match: Match) -> bool:
         # this is repeating work that rg has done, but rg provides lots of nice
         # things I don't want to reimplement
-        m = cls.regex().match(submatch["match"])
+        m = cls.regex().match(match["match"])
         if m:
-            submatch["groups"] = m.groupdict()  # this is useful for debugging
+            match["groups"] = m.groupdict()  # this is useful for debugging
         return bool(m)
 
     @classmethod
@@ -253,9 +255,8 @@ class Search:
                         # There's probably a data structure that would do away
                         # with the need for this test.
                         continue
-                    for submatch in match["submatches"]:
-                        if search._match(matched, match, submatch):
-                            matched.add(search)
+                    if search._match(matched, match):
+                        matched.add(search)
                 return matched
 
             matches: Iterator[ClassifiedMatch] = map(
@@ -436,20 +437,20 @@ class Styles(FrontendCode):
     classname = r"[\w_-]+"
 
     @classmethod
-    def _match(cls, matched, match, submatch):
-        m = Styles.regex().search(submatch["match"])
+    def _match(cls, matched, match):
+        m = Styles.regex().search(match["match"])
         classes = m["classes"].split()
         for classname in classes:
             if re.match(cls.classname, classname):
-                if "groups" not in submatch:
-                    submatch["groups"] = m.groupdict()
-                    submatch["groups"]["classes"] = set(classes)
-                    submatch["groups"]["classname"] = set()
+                if "groups" not in match:
+                    match["groups"] = m.groupdict()
+                    match["groups"]["classes"] = set(classes)
+                    match["groups"]["classname"] = set()
                 if cls is not Styles:
-                    submatch["groups"]["classname"].add(classname)
+                    match["groups"]["classname"].add(classname)
                 matched.add(cls)
-        if "groups" in submatch and (
-            submatch["groups"]["classname"] != submatch["groups"]["classes"]
+        if "groups" in match and (
+            match["groups"]["classname"] != match["groups"]["classes"]
         ):
             matched.add(Styles)
         else:
