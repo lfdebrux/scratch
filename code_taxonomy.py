@@ -51,7 +51,6 @@ from typing import (
 
 import sh  # type: ignore
 from sh import git, rg  # type: ignore
-from typing_extensions import TypedDict
 
 FRONTEND_REPOS = {
     Path("digitalmarketplace-admin-frontend"),
@@ -82,10 +81,6 @@ def github_url(match) -> Optional[str]:
     return (
         f"https://github.com/{org}/{repo}/blob/{revision}/{Path(*path)}#{line_number}"
     )
-
-
-class MatchedLines:
-    pass
 
 
 class Search:
