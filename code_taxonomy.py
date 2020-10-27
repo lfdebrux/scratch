@@ -38,6 +38,7 @@ import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
 from typing import (
+    Any,
     ClassVar,
     Counter,
     Dict,
@@ -53,6 +54,7 @@ from typing import (
 
 import sh  # type: ignore
 from sh import git, rg  # type: ignore
+from typing_extensions import TypedDict
 
 FRONTEND_REPOS = {
     Path("digitalmarketplace-admin-frontend"),
@@ -83,6 +85,23 @@ def github_url(match) -> Optional[str]:
     return (
         f"https://github.com/{org}/{repo}/blob/{revision}/{Path(*path)}#{line_number}"
     )
+
+
+class Match(TypedDict):
+    path: Path
+    lines: str
+    line_number: int
+    submatches: List[Submatch]
+
+
+class Submatch(TypedDict, total=False):
+    match: str
+    groups: Dict[str, Any]
+
+
+class ClassifiedMatch(Match):
+    epics: Set[str]
+    github_url: Optional[str]
 
 
 class Search:
@@ -170,7 +189,7 @@ class Search:
     @classmethod
     def _search(
         cls, pattern: Pattern, paths: Iterable[Path], globs: Iterable[str]
-    ) -> Iterator[dict]:
+    ) -> Iterator[Match]:
         args: Tuple[str, ...] = tuple(
             itertools.chain(
                 *itertools.product(("-e",), [pattern.pattern]),
@@ -187,7 +206,9 @@ class Search:
         return matches
 
     @classmethod
-    def _match(cls, matched: Set[Type["Search"]], match: dict, submatch: dict) -> bool:
+    def _match(
+        cls, matched: Set[Type["Search"]], match: Match, submatch: Submatch
+    ) -> bool:
         # this is repeating work that rg has done, but rg provides lots of nice
         # things I don't want to reimplement
         m = cls.regex().match(submatch["match"])
@@ -201,7 +222,7 @@ class Search:
         searches: Iterable[Type["Search"]],
         *,
         paths: Optional[Iterable[Path]] = None,
-    ) -> Iterator[dict]:
+    ) -> Iterator[ClassifiedMatch]:
         logging.debug(f"searching for {searches}")
         # We are going to construct a list of searches, tree leaves first.
         # This assumes your class hierarchy has more specific searches the
@@ -220,10 +241,10 @@ class Search:
                     subsearches.append(sub)
 
             pattern = subsearches[-1].regex()  # get the widest search pattern
-            matches = cls._search(pattern, paths or args[1], args[2])
+            _matches = cls._search(pattern, paths or args[1], args[2])
 
             def _classify(
-                match: dict, searches: Iterable[Type["Search"]]
+                match: Match, searches: Iterable[Type["Search"]]
             ) -> Set[Type["Search"]]:
                 matched: Set[Type[Search]] = set()
                 for search in searches:
@@ -237,13 +258,13 @@ class Search:
                             matched.add(search)
                 return matched
 
-            matches = map(
+            matches: Iterator[ClassifiedMatch] = map(
                 lambda m: {
                     **m,
                     "epics": {sub.epic for sub in _classify(m, subsearches)},
                     "github_url": github_url(m),
                 },
-                matches,
+                _matches,
             )
 
             prune: Set[str] = {
