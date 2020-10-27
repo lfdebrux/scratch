@@ -602,7 +602,7 @@ class ValidationBannerTemplates(TemplateInclude):
 
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "--test":
-        from sh import black, flake8, mypy, python
+        from sh import black, flake8, mypy, python3
 
         sep = "------------------"
         err = lambda *args: print(*args, file=sys.stderr)  # noqa: E731
@@ -611,7 +611,7 @@ if __name__ == "__main__":
 
         try:
             err("running unit tests")
-            python("-m", "doctest", __file__, _fg=True)
+            python3("-m", "doctest", __file__, _fg=True)
         except sh.ErrorReturnCode:
             ret = 1
             err(sep)
