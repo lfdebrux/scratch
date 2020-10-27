@@ -280,7 +280,10 @@ class Search:
             formatter_class=RawDescriptionHelpFormatter,
         )
         parser.add_argument(
-            "epics", choices=epics.keys(), metavar="<epic>", help="epics to search for",
+            "epics",
+            choices=epics.keys(),
+            metavar="<epic>",
+            help="epics to search for",
         )
         parser.add_argument(
             "--format", choices=("csv", "json", "plain"), default="plain"
@@ -329,13 +332,15 @@ class Search:
             for m in matches:
                 for epic in m["epics"]:
                     printer(
-                        str(m["path"]), m["line_number"], m["lines"].strip(), epic,
+                        str(m["path"]),
+                        m["line_number"],
+                        m["lines"].strip(),
+                        epic,
                     )
 
 
 def test_code_search():
-    """Test the functioning of Search.search_for()
-    """
+    """Test the functioning of Search.search_for()"""
     # test fixtures
     from tempfile import TemporaryDirectory
 
