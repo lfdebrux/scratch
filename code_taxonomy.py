@@ -262,7 +262,7 @@ class Search:
         searches: Iterable[Type[Search]]
         epics: Dict[str, List[Type[Search]]]
 
-        searches = set(s for s in Search.all_searches() if hasattr(s, "epic"))
+        searches = set(s for s in cls.all_searches() if hasattr(s, "epic"))
         epics = {
             epic_key: list(epic_searches)
             for epic_key, epic_searches in itertools.groupby(
