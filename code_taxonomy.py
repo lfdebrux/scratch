@@ -27,6 +27,7 @@ In some places the code is excessively clever, and in others it is overly simpli
 Copyright (c) 2020, Crown Copyright (Government Digital Service)
 """
 
+import collections
 import csv
 import itertools
 import json
@@ -288,6 +289,11 @@ class Search:
         parser.add_argument(
             "--format", choices=("csv", "json", "plain"), default="plain"
         )
+        parser.add_argument(
+            "--summary",
+            action="store_true",
+            help="print statistics instead of normal output",
+        )
         parser.add_argument("--path", action="append")
         parser.add_argument("--verbose", "-v", action="count", default=0)
         args = parser.parse_args()
@@ -301,7 +307,15 @@ class Search:
         searches = epics[args.epics]
         matches = Search.search_for(searches, paths=args.path)
 
-        if args.format == "json":
+        if args.summary:
+            count = collections.Counter()
+            for m in matches:
+                for epic in m["epics"]:
+                    count[epic] += 1
+            print("epic", "count", sep=",")
+            for epic, count in count.items():
+                print(epic, count, sep=",")
+        elif args.format == "json":
 
             def json_dumps_default(obj):
                 if isinstance(obj, Path):
