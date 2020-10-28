@@ -233,3 +233,6 @@ class ValidationBannerTemplates(TemplateInclude):
     epic = "Error summary"
 
     template = "forms/validation.html"
+
+if __name__ == "__main__":
+    FrontendCode.main()
