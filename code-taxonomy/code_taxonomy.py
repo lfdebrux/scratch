@@ -29,6 +29,7 @@ Copyright (c) 2020, Crown Copyright (Government Digital Service)
 
 import collections
 import csv
+import datetime
 import itertools
 import json
 import logging
@@ -302,6 +303,9 @@ class Search:
             metavar="<epic>",
             help="epics to search for",
         )
+
+        iso_date_parser = lambda s: datetime.datetime.strptime(s, "%Y-%m-%d")
+        parser.add_argument("--from-date", type=iso_date_parser)
         parser.add_argument(
             "--format", choices=("csv", "json", "plain"), default="plain"
         )
@@ -321,6 +325,111 @@ class Search:
             logging.getLogger("sh").setLevel("DEBUG")
 
         searches = epics[args.epics]
+
+        if args.from_date:
+            date_range = [
+                (args.from_date + datetime.timedelta(days=n)).date()
+                for n in range(
+                    0, (datetime.date.today() - args.from_date.date()).days + 1, 7
+                )
+            ]
+            paths = {
+                path
+                for s in searches
+                for search in s.all_searches()
+                for path in search.paths
+            }
+            repos = {path: {} for path in paths}
+            # check all paths are okay
+            okay = True
+            for path in paths:
+                try:
+                    git_status = str(
+                        git("-C", path, "status", porcelain="v2", branch=True)
+                    ).splitlines()
+                    branch_head = [
+                        l.split(" ")[2]
+                        for l in git_status
+                        if l.startswith("# branch.head")
+                    ][0]
+                    repos[path]["ORIG_HEAD"] = branch_head
+                    if branch_head == "(detached)" in git_status:
+                        print(
+                            f"git repo {path} is in a detached state, you should checkout a branch before using --from-date",
+                            file=sys.stderr,
+                        )
+                        okay = False
+                    if any(l.startswith(("1", "2", "u")) for l in git_status):
+                        print(
+                            f"git repo {path} has changes, you should stash these before using --from-date",
+                            file=sys.stderr,
+                        )
+                        okay = False
+                except sh.ErrorReturnCode as e:
+                    print(f"git status failed for {path}: {e}", file=sys.stderr)
+                    okay = False
+            if not okay:
+                print(
+                    "the --date-from feature requires all paths to be a clean git repo",
+                    file=sys.stderr,
+                )
+                return
+            for path in paths:
+                repos[path]["date_revs"] = {
+                    date: str(
+                        git(
+                            "-C",
+                            path,
+                            "rev-list",
+                            "-1",
+                            f"--before={date.strftime('%Y-%m-%d')}",
+                            "--merges",  # try and restrict to working trees
+                            "--branches=ma*",  # main or master
+                        )
+                    ).strip()
+                    or None
+                    for date in date_range
+                }
+                if not all(repos[path]["date_revs"].values()):
+                    most_recent_bad_date = max(
+                        date
+                        for date, value in repos[path]["date_revs"].items()
+                        if value is None
+                    )
+                    print(
+                        f"date {most_recent_bad_date} is too far in the past for {path}"
+                    )
+                    okay = False
+            if not okay:
+                return
+            try:
+                date_totals = {
+                    date: {
+                        "revisions": {
+                            path: repos[path]["date_revs"][date] for path in repos
+                        }
+                    }
+                    for date in date_range
+                }
+                print("date", "count", sep=",")
+                for date in date_range:
+                    for path in paths:
+                        git(
+                            "-C", path, "checkout", date_totals[date]["revisions"][path]
+                        )
+                    matches = list(Search.search_for(searches))
+                    date_totals[date]["matches"] = matches
+                    print(date, len(matches), sep=",")
+            finally:
+                for path in repos:
+                    try:
+                        git("-C", path, "checkout", repos[path]["ORIG_HEAD"])
+                    except sh.ErrorReturnCode as e:
+                        print(
+                            f"warning, could not checkout {repos[path]['ORIG_HEAD']} in {path}: {e}"
+                        )
+            return
+
         matches = Search.search_for(searches, paths=args.path)
 
         if args.summary:
