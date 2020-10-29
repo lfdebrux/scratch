@@ -116,7 +116,7 @@ So you can do the same massive search over and over again.
 
 ---
 
-    $ # doitlive env: PYTHONPATH=.
+    $ # doitlive alias: cat="highlight -O ansi"
 
     # an example taxonomy file
     $ cat examples/python_taxonomy.py
@@ -125,16 +125,11 @@ So you can do the same massive search over and over again.
     # there are a few different output options
     $ python3 examples/python_taxonomy.py all
     $ python3 examples/python_taxonomy.py all --summary
-    $ python3 examples/python_taxonomy.py all --format=json
 
     # a real example can be quite a bit more complicated
     # dm_frontend_code_taxonomy.py has lots of different epics,
     # some of which can be searched for in different ways
     $ python3 examples/dm_frontend_code_taxonomy.py --help
-
-    # class-based inheritance lets us customise different
-    # parts of the taxonomy tree...
-    $ rg -A 20 _match examples/dm_frontend_code_taxonomy.py
 
     # and the total number of lines of code is more manageable
     $ wc -l examples/dm_frontend_code_taxonomy.py
