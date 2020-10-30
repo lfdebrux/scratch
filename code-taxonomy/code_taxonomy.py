@@ -304,7 +304,7 @@ class Search:
             help="epics to search for",
         )
 
-        iso_date_parser = lambda s: datetime.datetime.strptime(s, "%Y-%m-%d")
+        iso_date_parser = lambda s: datetime.datetime.strptime(s, "%Y-%m-%d").date()
         parser.add_argument("--from-date", type=iso_date_parser)
         parser.add_argument(
             "--format", choices=("csv", "json", "plain"), default="plain"
@@ -328,9 +328,9 @@ class Search:
 
         if args.from_date:
             date_range = [
-                (args.from_date + datetime.timedelta(days=n)).date()
+                args.from_date + datetime.timedelta(days=n)
                 for n in range(
-                    0, (datetime.date.today() - args.from_date.date()).days + 1, 7
+                    0, (datetime.date.today() - args.from_date).days + 1, 7
                 )
             ]
             paths = {
