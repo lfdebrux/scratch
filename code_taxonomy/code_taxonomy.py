@@ -276,13 +276,17 @@ class Search:
         searches: Iterable[Type[Search]]
         epics: Dict[str, List[Type[Search]]]
 
+        def search_epic_key(s: Search) -> str:
+            return s.epic.lower().translate(
+                str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
+            )
+
         searches = set(s for s in cls.all_searches() if hasattr(s, "epic"))
-        to_key = str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
         epics = {
             epic_key: list(epic_searches)
             for epic_key, epic_searches in itertools.groupby(
-                searches,
-                key=lambda c: c.epic.lower().translate(to_key),
+                sorted(searches, key=search_epic_key),
+                key=search_epic_key,
             )
         }
         epics.setdefault("all", [cls])
