@@ -13,16 +13,36 @@ FRONTEND_REPOS = {
 }
 
 
+FRAMEWORKS = {
+    Path("digitalmarketplace-frameworks", "frameworks", "digital-outcomes-and-specialists-5"),
+    Path("digitalmarketplace-frameworks", "frameworks", "g-cloud-12"),
+}
+
+
 #
 # Rules
 #
 
 
 class FrontendCode(Search):
-    epic = "All components"
+    epic = "All"
 
     paths = FRONTEND_REPOS
-    globs = {"!__snapshots__/**", "!*/tests/**"}
+    globs = {"!__snapshots__/**", "!tests/**"}
+
+
+class Components(FrontendCode):
+    epic = "All components"
+
+
+class ContentLoaderQuestions(FrontendCode):
+    epic = "All questions"
+
+    paths = [p / "questions" for p in FRAMEWORKS]
+
+    pattern = r"type: {question_type}"
+
+    question_type = r"\w*"
 
 
 class Styles(FrontendCode):
@@ -149,6 +169,12 @@ class DateInputWTForms(DMWTForms):
     epic = "Date input"
 
     field_type = "Date"
+
+
+class DateInputQuestion(ContentLoaderQuestions):
+    epic = "Date input"
+
+    question_type = "date"
 
 
 class DMSpeak(Styles):
