@@ -99,6 +99,12 @@ class DMWTForms(FrontendCode):
 #
 
 
+class Alerts(TemplateInclude):
+    epic = "Alerts"
+
+    template = "flash_messages.html"
+
+
 class AppStyles(Styles):
     epic = "App overrides"
 
@@ -107,7 +113,7 @@ class AppStyles(Styles):
     prune = True
 
 
-class BuyerFrontendOverrides(Styles):
+class AppOverrides(Styles):
     epic = "App overrides (old)"
 
     classname = r"""(?x:
@@ -116,7 +122,8 @@ class BuyerFrontendOverrides(Styles):
         which-service-won-contract-page |
         tell-us-about-contract-page |
         did-you-award-contract-page |
-        sidebar-heading
+        sidebar-heading |
+        padding-bottom-small
     )"""
 
 
@@ -130,6 +137,12 @@ class ContactDetails(TemplateInclude):
     epic = "Contact details"
 
     template = "contact-details.html"
+
+
+class ContentLoaderForms(MacroImport):
+    epic = "Content loader"
+
+    macros_from = "forms/macros/forms.html"
 
 
 class DateInputWTForms(DMWTForms):
@@ -182,6 +195,12 @@ class InsetText(Styles):
     classname = r"(panel.*|notice.*)"
 
 
+class ListStyles(Styles):
+    epic = "List styles"
+
+    classname = r"(check-list|explanation-list|list-bullet-small)"
+
+
 class NotificationBannerTemplate(TemplateInclude):
     epic = "Banner"
 
@@ -204,6 +223,12 @@ class RadiosWTForms(DMWTForms):
     epic = "Radios"
 
     field_type = "Radio"
+
+
+class SummaryTable(MacroImport):
+    epic = "Summary list"
+
+    macros_from = "summary-table.html"
 
 
 class SearchSummaryStyles(Styles):
