@@ -14,7 +14,11 @@ FRONTEND_REPOS = {
 
 
 FRAMEWORKS = {
-    Path("digitalmarketplace-frameworks", "frameworks", "digital-outcomes-and-specialists-5"),
+    Path(
+        "digitalmarketplace-frameworks",
+        "frameworks",
+        "digital-outcomes-and-specialists-5",
+    ),
     Path("digitalmarketplace-frameworks", "frameworks", "g-cloud-12"),
 }
 
