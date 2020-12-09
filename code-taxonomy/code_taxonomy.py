@@ -27,6 +27,7 @@ In some places the code is excessively clever, and in others it is overly simpli
 Copyright (c) 2020, Crown Copyright (Government Digital Service)
 """
 
+import collections
 import csv
 import itertools
 import json
@@ -37,7 +38,9 @@ import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
 from typing import (
+    Any,
     ClassVar,
+    Counter,
     Dict,
     Iterable,
     Iterator,
@@ -52,16 +55,6 @@ from typing import (
 import sh  # type: ignore
 from sh import git, rg  # type: ignore
 from typing_extensions import TypedDict
-
-FRONTEND_REPOS = {
-    Path("digitalmarketplace-admin-frontend"),
-    Path("digitalmarketplace-buyer-frontend"),
-    Path("digitalmarketplace-briefs-frontend"),
-    Path("digitalmarketplace-brief-responses-frontend"),
-    Path("digitalmarketplace-supplier-frontend"),
-    Path("digitalmarketplace-user-frontend"),
-}
-
 
 _repos: Dict[str, str] = {}
 
@@ -84,8 +77,20 @@ def github_url(match) -> Optional[str]:
     )
 
 
-class MatchedLines:
-    pass
+class Match(TypedDict):
+    lines: str
+    line_number: int
+    match: str
+    path: Path
+
+
+class ClassifiedMatch(Match):
+    epics: Set[str]
+    github_url: Optional[str]
+
+    # By default this is the output of re.Match.groupdict() but if you override
+    # Search._match() you can put whatever you find useful here
+    groups: Dict[str, Any]
 
 
 class Search:
@@ -173,7 +178,7 @@ class Search:
     @classmethod
     def _search(
         cls, pattern: Pattern, paths: Iterable[Path], globs: Iterable[str]
-    ) -> Iterator[dict]:
+    ) -> Iterator[Match]:
         args: Tuple[str, ...] = tuple(
             itertools.chain(
                 *itertools.product(("-e",), [pattern.pattern]),
@@ -186,16 +191,21 @@ class Search:
         results = (
             json.loads(line, object_hook=cls.rg_json_object_hook) for line in out
         )
-        matches = (result["data"] for result in results if result["type"] == "match")
-        return matches
+        rg_matches = (result["data"] for result in results if result["type"] == "match")
+        for m in rg_matches:
+            for sub in m["submatches"]:
+                match: Match = m.copy()
+                del match["submatches"]
+                match.update(sub)
+                yield match
 
     @classmethod
-    def _match(cls, matched: Set[Type["Search"]], match: dict, submatch: dict) -> bool:
+    def _match(cls, matched: Set[Type["Search"]], match: Match) -> bool:
         # this is repeating work that rg has done, but rg provides lots of nice
         # things I don't want to reimplement
-        m = cls.regex().match(submatch["match"])
+        m = cls.regex().match(match["match"])
         if m:
-            submatch["groups"] = m.groupdict()  # this is useful for debugging
+            match["groups"] = m.groupdict()  # this is useful for debugging
         return bool(m)
 
     @classmethod
@@ -204,7 +214,7 @@ class Search:
         searches: Iterable[Type["Search"]],
         *,
         paths: Optional[Iterable[Path]] = None,
-    ) -> Iterator[dict]:
+    ) -> Iterator[ClassifiedMatch]:
         logging.debug(f"searching for {searches}")
         # We are going to construct a list of searches, tree leaves first.
         # This assumes your class hierarchy has more specific searches the
@@ -223,10 +233,10 @@ class Search:
                     subsearches.append(sub)
 
             pattern = subsearches[-1].regex()  # get the widest search pattern
-            matches = cls._search(pattern, paths or args[1], args[2])
+            _matches = cls._search(pattern, paths or args[1], args[2])
 
             def _classify(
-                match: dict, searches: Iterable[Type["Search"]]
+                match: Match, searches: Iterable[Type["Search"]]
             ) -> Set[Type["Search"]]:
                 matched: Set[Type[Search]] = set()
                 for search in searches:
@@ -235,18 +245,17 @@ class Search:
                         # There's probably a data structure that would do away
                         # with the need for this test.
                         continue
-                    for submatch in match["submatches"]:
-                        if search._match(matched, match, submatch):
-                            matched.add(search)
+                    if search._match(matched, match):
+                        matched.add(search)
                 return matched
 
-            matches = map(
+            matches: Iterator[ClassifiedMatch] = map(
                 lambda m: {
                     **m,
                     "epics": {sub.epic for sub in _classify(m, subsearches)},
                     "github_url": github_url(m),
                 },
-                matches,
+                _matches,
             )
 
             prune: Set[str] = {
@@ -267,14 +276,17 @@ class Search:
         searches: Iterable[Type[Search]]
         epics: Dict[str, List[Type[Search]]]
 
-        searches = set(s for s in Search.all_searches() if hasattr(s, "epic"))
+        def search_epic_key(s: Search) -> str:
+            return s.epic.lower().translate(
+                str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
+            )
+
+        searches = set(s for s in cls.all_searches() if hasattr(s, "epic"))
         epics = {
             epic_key: list(epic_searches)
             for epic_key, epic_searches in itertools.groupby(
-                searches,
-                key=lambda c: c.epic.lower().translate(
-                    str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
-                ),
+                sorted(searches, key=search_epic_key),
+                key=search_epic_key,
             )
         }
         epics.setdefault("all", [cls])
@@ -285,10 +297,18 @@ class Search:
             formatter_class=RawDescriptionHelpFormatter,
         )
         parser.add_argument(
-            "epics", choices=epics.keys(), metavar="<epic>", help="epics to search for",
+            "epics",
+            choices=epics.keys(),
+            metavar="<epic>",
+            help="epics to search for",
         )
         parser.add_argument(
             "--format", choices=("csv", "json", "plain"), default="plain"
+        )
+        parser.add_argument(
+            "--summary",
+            action="store_true",
+            help="print statistics instead of normal output",
         )
         parser.add_argument("--path", action="append")
         parser.add_argument("--verbose", "-v", action="count", default=0)
@@ -303,7 +323,15 @@ class Search:
         searches = epics[args.epics]
         matches = Search.search_for(searches, paths=args.path)
 
-        if args.format == "json":
+        if args.summary:
+            counter: Counter[str] = collections.Counter()
+            for m in matches:
+                for epic in m["epics"]:
+                    counter[epic] += 1
+            print("epic", "count", sep=",")
+            for epic, count in counter.items():
+                print(epic, count, sep=",")
+        elif args.format == "json":
 
             def json_dumps_default(obj):
                 if isinstance(obj, Path):
@@ -334,318 +362,12 @@ class Search:
             for m in matches:
                 for epic in m["epics"]:
                     printer(
-                        str(m["path"]), m["line_number"], m["lines"].strip(), epic,
+                        str(m["path"]),
+                        m["line_number"],
+                        m["lines"].strip(),
+                        epic,
                     )
 
 
-def test_code_search():
-    """Test the functioning of Search.search_for()
-    """
-    # test fixtures
-    from tempfile import TemporaryDirectory
-
-    with TemporaryDirectory() as testdir:
-        testdir = Path(testdir)
-        (testdir / "test1.txt").write_text("Hello foo")
-        (testdir / "test2.txt").write_text("Hello bar")
-        (testdir / "test3.txt").write_text("Goodbye foobar")
-
-        class Hello(Search):
-            epic = "Hello"
-            paths = (testdir,)
-            pattern = r"Hello {name}"
-            name = ".*"
-
-        class HelloFoo(Hello):
-            epic = "Hello foo"
-            name = "foo"
-
-        matches = list(Search.search_for([Hello, HelloFoo]))
-
-        assert len(matches) == 2
-        for match in matches:
-            assert str(match["path"]).startswith(str(testdir))
-            if match["path"].name == "test1.txt":
-                assert match["epics"] == {"Hello foo"}
-                assert match["lines"] == "Hello foo"
-            elif match["path"].name == "test2.txt":
-                assert match["epics"] == {"Hello"}
-                assert match["lines"] == "Hello bar"
-            else:
-                assert match["path"].name != "test3.txt"
-
-    return None
-
-
-#
-# Rules
-#
-
-
-class FrontendCode(Search):
-    epic = "All components"
-
-    paths = FRONTEND_REPOS
-    globs = {"!__snapshots__/**", "!*/tests/**"}
-
-
-class Styles(FrontendCode):
-    epic = "All styles"
-
-    pattern = r"""<{element} [^>]*class=["']{classes}["'][^>]*>"""
-
-    element = (
-        r"(a|button|div|h[1-6]|input|li|ol|p|strong|ul)"  # no need to look at all tags
-    )
-    classes = r"(?:{classname}[ ]?)+"
-    classname = r"[\w_-]+"
-
-    @classmethod
-    def _match(cls, matched, match, submatch):
-        m = Styles.regex().search(submatch["match"])
-        classes = m["classes"].split()
-        for classname in classes:
-            if re.match(cls.classname, classname):
-                if "groups" not in submatch:
-                    submatch["groups"] = m.groupdict()
-                    submatch["groups"]["classes"] = set(classes)
-                    submatch["groups"]["classname"] = set()
-                if cls is not Styles:
-                    submatch["groups"]["classname"].add(classname)
-                matched.add(cls)
-        if "groups" in submatch and (
-            submatch["groups"]["classname"] != submatch["groups"]["classes"]
-        ):
-            matched.add(Styles)
-        else:
-            matched.discard(Styles)
-        return cls in matched
-
-
-class GOVUKStyles(Styles):
-    epic = "GOV.UK Frontend styles"
-
-    classname = r"""govuk-[\w_-]+"""
-
-    prune = True
-
-
-class JinjaCode(FrontendCode):
-    epic = "All Jinja code"
-
-
-class MacroImport(JinjaCode):
-    epic = "All macros"
-
-    pattern = r"""\{{% import ['"]toolkit/{macros_from}['"]( as \w*)? %\}}"""
-
-    macros_from = r"""[^'"]+"""
-
-
-class TemplateInclude(JinjaCode):
-    epic = "All templates"
-
-    pattern = r"""\{{% include ['"]toolkit/{template}['"] %\}}"""
-
-    template = r"""[^'"]+"""
-
-
-class DMWTForms(FrontendCode):
-    epic = "DMUtils WTForms"
-
-    pattern = r"DM{field_type}Field"
-
-    field_type = r"(Boolean|Decimal|Hidden|Integer|Radio|String|Email|StripWhitespaceString|Date)"
-
-
-#
-# Epics
-#
-
-
-class AppStyles(Styles):
-    epic = "App overrides"
-
-    classname = r"app-*"
-
-    prune = True
-
-
-class BuyerFrontendOverrides(Styles):
-    epic = "App overrides (old)"
-
-    classname = r"""(?x:
-        save-search-page |
-        marketplace-homepage-heading |
-        which-service-won-contract-page |
-        tell-us-about-contract-page |
-        did-you-award-contract-page |
-        sidebar-heading
-    )"""
-
-
-class CheckboxesWTForms(DMWTForms):
-    epic = "Checkboxes"
-
-    field_type = "Boolean"
-
-
-class ContactDetails(TemplateInclude):
-    epic = "Contact details"
-
-    template = "contact-details.html"
-
-
-class DateInputWTForms(DMWTForms):
-    epic = "Date input"
-
-    field_type = "Date"
-
-
-class DMSpeak(Styles):
-    epic = "DMSpeak"
-
-    classname = r"(dmspeak|legal-content|single-question-page)"
-
-
-class DMFrontendStyles(Styles):
-    epic = "Digital Marketplace GOV.UK Frontend styles"
-
-    classname = r"dm-.*"
-
-    prune = True
-
-
-class JavaScript(Styles):
-    epic = "JavaScript"
-
-    classname = r"js-.*"
-
-
-class Headings(Styles):
-    epic = "Typography"
-
-    classname = r"(heading-.*|sidebar-heading|marketplace-homepage-heading)"
-
-
-class InstructionListStyles(Styles):
-    epic = "Instruction list"
-
-    classname = r"browse-list.*"
-
-
-class InstructionListTemplate(TemplateInclude):
-    epic = "Instruction list"
-
-    template = "instruction-list.html"
-
-
-class InsetText(Styles):
-    epic = "Inset text"
-
-    classname = r"(panel.*|notice.*)"
-
-
-class NotificationBannerTemplate(TemplateInclude):
-    epic = "Banner"
-
-    template = "notification-banner.html"
-
-
-class NotificationBannerStyles(Styles):
-    epic = "Banner"
-
-    classname = r"banner.*"
-
-
-class RadiosTemplate(TemplateInclude):
-    epic = "Radios"
-
-    template = r"forms/(_selection-button|selection-buttons).html"
-
-
-class RadiosWTForms(DMWTForms):
-    epic = "Radios"
-
-    field_type = "Radio"
-
-
-class SearchSummaryStyles(Styles):
-    epic = "Search summary"
-
-    classname = "search-summary.*"
-
-
-class SearchSummaryTemplate(TemplateInclude):
-    epic = "Search summary"
-
-    template = "search-summary.html"
-
-
-class TemporaryMessageTemplate(TemplateInclude):
-    epic = "Banner"
-
-    template = "temporary-message.html"
-
-
-class TextInputWTForms(DMWTForms):
-    epic = "Text input"
-
-    field_type = "StripWhitespaceString"
-
-
-class ValidationBannerTemplates(TemplateInclude):
-    epic = "Error summary"
-
-    template = "forms/validation.html"
-
-
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and sys.argv[1] == "--test":
-        from sh import black, flake8, mypy, python
-
-        sep = "------------------"
-        err = lambda *args: print(*args, file=sys.stderr)  # noqa: E731
-
-        ret = 0
-
-        try:
-            err("running unit tests")
-            python("-m", "doctest", __file__, _fg=True)
-        except sh.ErrorReturnCode:
-            ret = 1
-            err(sep)
-
-        try:
-            err("running integration test")
-            test_code_search()
-        except AssertionError as e:
-            ret = 1
-            err(f"integration test test_code_search() failed with error: {e}")
-            err(sep)
-
-        try:
-            err(f"flake8 {sys.argv[0]}")
-            flake8(__file__, ignore="E501", _fg=True)
-        except sh.ErrorReturnCode:
-            ret = 1
-            err(sep)
-
-        try:
-            err(f"mypy {sys.argv[0]}")
-            mypy(__file__, _fg=True)
-        except sh.ErrorReturnCode:
-            ret = 1
-        finally:
-            err(sep)
-
-        try:
-            err(f"black {sys.argv[0]}")
-            black(__file__, check=True, _fg=True)
-        except sh.ErrorReturnCode:
-            ret = 1
-
-        sys.exit(ret)
-
-    else:
-        Search.main()
+    Search.main()
