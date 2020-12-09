@@ -45,11 +45,14 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Mapping,
     Optional,
     Pattern,
     Set,
+    Sequence,
     Tuple,
     Type,
+    Union,
 )
 
 import sh  # type: ignore
@@ -57,24 +60,6 @@ from sh import git, rg  # type: ignore
 from typing_extensions import TypedDict
 
 _repos: Dict[str, str] = {}
-
-
-def github_url(match) -> Optional[str]:
-    repo, *path = match["path"].parts
-    if repo in _repos:
-        revision = _repos[repo]
-    else:
-        try:
-            ret = git("-C", repo, "rev-parse", "--short", "HEAD")
-        except sh.ErrorReturnCode:
-            return None
-        revision = str(ret).strip()
-        _repos[repo] = revision
-    org = "alphagov"
-    line_number = f"L{match['line_number']}"
-    return (
-        f"https://github.com/{org}/{repo}/blob/{revision}/{Path(*path)}#{line_number}"
-    )
 
 
 class Match(TypedDict):
@@ -93,6 +78,24 @@ class ClassifiedMatch(Match):
     groups: Dict[str, Any]
 
 
+def github_url(match: Match) -> Optional[str]:
+    repo, *path = match["path"].parts
+    if repo in _repos:
+        revision = _repos[repo]
+    else:
+        try:
+            ret = git("-C", repo, "rev-parse", "--short", "HEAD")
+        except sh.ErrorReturnCode:
+            return None
+        revision = str(ret).strip()
+        _repos[repo] = revision
+    org = "alphagov"
+    line_number = f"L{match['line_number']}"
+    return (
+        f"https://github.com/{org}/{repo}/blob/{revision}/{Path(*path)}#{line_number}"
+    )
+
+
 class Search:
     epic: ClassVar[str]
 
@@ -108,7 +111,7 @@ class Search:
         return hasattr(cls, "pattern")  # TODO: improve this
 
     @classmethod
-    def all_searches(cls, include_self=True) -> Iterable:
+    def all_searches(cls, include_self: bool = True) -> Iterable[Type["Search"]]:
         """Walk through the class hierarchy leaves first (post-order)
 
         >>> class TestSearch(Search):
@@ -144,7 +147,16 @@ class Search:
         """
 
         class RegexFormatter(string.Formatter):
-            def get_value(self, key, args, kwargs):
+            def get_value(
+                self,
+                key: Union[int, str],
+                args: Sequence[Any],
+                kwargs: Mapping[str, Any],
+            ) -> str:
+                if not isinstance(key, str):
+                    raise TypeError(
+                        "regex template strings only support named substitutions"
+                    )
                 try:
                     regex = getattr(cls, key)
                     regex = RegexFormatter().format(regex)
@@ -161,7 +173,7 @@ class Search:
             )
 
     @staticmethod
-    def rg_json_object_hook(obj):
+    def rg_json_object_hook(obj: dict) -> Any:
         """
         >>> Search.rg_json_object_hook({'text': 'Hello world!'})
         'Hello world!'
@@ -195,7 +207,7 @@ class Search:
         for m in rg_matches:
             for sub in m["submatches"]:
                 match: Match = m.copy()
-                del match["submatches"]
+                del match["submatches"]  # type: ignore
                 match.update(sub)
                 yield match
 
@@ -205,7 +217,8 @@ class Search:
         # things I don't want to reimplement
         m = cls.regex().match(match["match"])
         if m:
-            match["groups"] = m.groupdict()  # this is useful for debugging
+            # this is useful for debugging
+            match["groups"] = m.groupdict()  # type: ignore
         return bool(m)
 
     @classmethod
@@ -251,7 +264,7 @@ class Search:
 
             matches: Iterator[ClassifiedMatch] = map(
                 lambda m: {
-                    **m,
+                    **m,  # type: ignore
                     "epics": {sub.epic for sub in _classify(m, subsearches)},
                     "github_url": github_url(m),
                 },
@@ -266,20 +279,22 @@ class Search:
             }
             if prune:
                 logging.debug(f"pruning epics {prune}")
-                matches = map(lambda m: {**m, "epics": m["epics"] - prune}, matches)
+                matches = map(
+                    lambda m: {**m, "epics": m["epics"] - prune},  # type: ignore
+                    matches,
+                )
                 matches = filter(lambda m: bool(m["epics"]), matches)
 
             yield from matches
 
     @classmethod
-    def main(cls, argv=None) -> None:
+    def main(cls, argv: Optional[list] = None) -> None:
         searches: Iterable[Type[Search]]
         epics: Dict[str, List[Type[Search]]]
 
-        def search_epic_key(s: Search) -> str:
-            return s.epic.lower().translate(
-                str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
-            )
+        def search_epic_key(s: Type[Search]) -> str:
+            trans = str.maketrans({" ": "-", ".": "", "(": "", ")": ""})
+            return s.epic.lower().translate(trans)
 
         searches = set(s for s in cls.all_searches() if hasattr(s, "epic"))
         epics = {
@@ -333,7 +348,7 @@ class Search:
                 print(epic, count, sep=",")
         elif args.format == "json":
 
-            def json_dumps_default(obj):
+            def json_dumps_default(obj: object) -> Any:
                 if isinstance(obj, Path):
                     return str(obj)
                 elif isinstance(obj, set):
