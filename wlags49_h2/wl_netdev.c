@@ -903,8 +903,6 @@ int wl_rx(struct net_device *dev)
 					}
 #endif /* USE_WDS */
 
-					dev->last_rx = jiffies;
-
 #ifdef WIRELESS_EXT
 #ifdef WIRELESS_SPY
 					if (lp->spydata.spy_number > 0) {
@@ -1921,8 +1919,6 @@ int wl_rx_dma(struct net_device *dev)
 						    rx_bytes += pktlen;
 					}
 #endif /* USE_WDS */
-
-					dev->last_rx = jiffies;
 
 				} else {
 					DBG_ERROR(DbgInfo,
