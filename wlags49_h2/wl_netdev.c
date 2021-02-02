@@ -675,7 +675,7 @@ int wl_send(struct wl_private *lp)
 	status = hcf_send_msg(&(lp->hcfCtx), desc, lp->txF.port);
 
 	if (status == HCF_SUCCESS) {
-		lp->dev->trans_start = jiffies;
+		netif_trans_update(lp->dev);
 
 		DBG_TX(DbgInfo, "Transmit...\n");
 
